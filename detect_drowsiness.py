@@ -1,4 +1,84 @@
+
+# This Code is for running the detection application in Google Colab with GPU runtime
+
 import cv2
+import numpy as np
+from keras.models import load_model
+from keras.preprocessing.image import img_to_array
+
+classes = ['Closed', 'Open']
+face_cascade = cv2.CascadeClassifier("data/haarcascade_frontalface_default.xml")
+left_eye_cascade = cv2.CascadeClassifier("data/haarcascade_lefteye_2splits.xml")
+right_eye_cascade = cv2.CascadeClassifier("data/haarcascade_righteye_2splits.xml")
+model = load_model("drowiness_DetectionH5.h5")
+
+#model returns 2 for closed eye and 3 for open eyes
+count = 0
+status1 = ''
+status2 = ''
+
+# below code is for simulation of Video capture in Google Colab.  Since we can't live stream video from laptop to Colab, 
+# we captured frames of pictures which will give the perspective of Live Video.
+
+for i in range(21):
+    Image="test/photo"+str(i)+".jpg"
+    img = cv2.imread(Image)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+    for (x, y, w, h) in faces:
+        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 1)
+        roi_gray = gray[y:y+h, x:x+w]
+        roi_color = img[y:y+h, x:x+w]
+        left_eye = left_eye_cascade.detectMultiScale(roi_gray)
+        right_eye = right_eye_cascade.detectMultiScale(roi_gray)
+
+        for (x1, y1, w1, h1) in left_eye:
+            cv2.rectangle(roi_color, (x1, y1), (x1 + w1, y1 + h1), (0, 255, 0), 1)
+            eye1 = roi_color[y1:y1+h1, x1:x1+w1]
+            eye1 = cv2.resize(eye1, (145, 145))
+            eye1 = eye1.astype('float') / 255.0
+            eye1 = img_to_array(eye1)
+            eye1 = np.expand_dims(eye1, axis=0)
+            pred1 = model.predict(eye1)
+            status1=np.argmax(pred1)
+            break
+
+        for (x2, y2, w2, h2) in right_eye:
+            cv2.rectangle(roi_color, (x2, y2), (x2 + w2, y2 + h2), (0, 255, 0), 1)
+            eye2 = roi_color[y2:y2 + h2, x2:x2 + w2]
+            eye2 = cv2.resize(eye2, (145, 145))
+            eye2 = eye2.astype('float') / 255.0
+            eye2 = img_to_array(eye2)
+            eye2 = np.expand_dims(eye2, axis=0)
+            pred2 = model.predict(eye2)
+            status2=np.argmax(pred2)
+            break
+
+        # If the eyes are closed, start counting
+        if status1 == 2 and status2 == 2:
+            count += 1
+            cv2.putText(img, "Eyes Closed, Frame count: " + str(count), (10, 30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 1)
+            # if eyes are closed for 10 consecutive frames, start the alarm
+            if count >= 10:
+                cv2.putText(img, "Drowsiness Alert!!!", (100, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+                print("Drowsiness Alert!......wake Up... DANGER!! DANGER!!..\n")
+        else:
+            #cv2.putText(img, "Eyes Open", (10, 30), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 1)
+            print("Eyes are Open...Driver is awake..\n")
+            count = 0
+
+
+cv2.destroyAllWindows()
+
+
+
+
+
+# below code is used for running the app in local PC with Nvdia GPU and Cuda.
+# For Non Nvdia GPU, below Code won't work because CUDA library in tensorflow is not defined for OpenCV yet.
+
+'''import cv2
 import numpy as np
 
 from keras.models import load_model
@@ -85,4 +165,5 @@ while True:
         break
 
 cap.release()
-cv2.destroyAllWindows()
+cv2.destroyAllWindows()'''
+
